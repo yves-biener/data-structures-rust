@@ -1,0 +1,10 @@
+#+title: Linked Lists in Rust
+#+author: Yves Biener
+#+email: yves.biener@gmx.de
+#+language: en
+
+For the implementations for linked lists I used this [[https://rust-unofficial.github.io/too-many-lists/first-layout.html][Book]]. The Book itself has
+good content but the mixture between beginner, intermediate (and sometimes even
+expert) levels of details makes it pretty annoying to read. Otherwise is the
+information and the content it contains very useful and helpful for the
+implementation of ~linked lists~.

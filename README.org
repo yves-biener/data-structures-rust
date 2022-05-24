@@ -1,0 +1,13 @@
+#+title: Basic Data Structures in Rust
+#+author: Yves Biener
+#+email: yves.biener@gmx.de
+#+language: en
+
+This repository contains example implementations for basic data structures, like
+~linked lists~, ~tries~, ~trees~, etc.
+
+Each data structure will be implemented in it's own module which can contain
+multiple different implementations for comparision. For details about the data
+structure, the implementation and other related information about the
+implementation (e.g. sources I used) please see the individual =README.org= of
+the module folders for the corresponding data structure.
