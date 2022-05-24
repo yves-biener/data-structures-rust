@@ -70,3 +70,81 @@ impl<T> Drop for List<T> {
 	}
     }
 }
+
+// into_iter
+// trivial wrapper around list for into_iter
+pub struct IntoIter<T>(List<T>);
+
+impl<T> List<T> {
+    pub fn into_iter(self) -> IntoIter<T> {
+	IntoIter(self)
+    }
+}
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+	// access fields of a tuple struct numerically
+        self.0.pop()
+    }
+}
+
+// iter
+pub struct Iter<'a, T> {
+    next: Option<&'a Node<T>>,
+}
+
+// No lifetime here, List doesn't have any associated lifetimes
+impl<T> List<T> {
+    // We declare a fresh lifetime here for the *exact* borrow thta creates the
+    // iter. Now &self needs to be valid as long as the Iter is around.
+    // When using `as_deref` we don't need to provide lifetimes anymore, as the
+    // compiler can figure them out by himself.
+    // Instead of "hiding" that a struct contains a lifetime, you can use the
+    // explicitly elided lifetime syntax `'_`
+    pub fn iter(&self) -> Iter<'_, T> {
+	// The `as_deref` and `as_defer_mut` functions are stable as of Rust
+	// 1.40. Before that you would need to do `map(|node| &**node)` and
+	// `map(|node| &mut**node)`. In this case the closure in conjunction
+	// with the fact that we have an `Option<&T>` instead of `&T` is a bit
+	// too compliacted for the bollow checker to work out, so we need to
+	// help it by being explicit.
+	Iter { next: self.head.as_deref() }
+    }
+}
+
+// We *do* have a lifetime here, because Iter has one that we need to define
+impl<'a, T> Iterator for Iter<'a, T> {
+    type Item = &'a T;
+
+    // Self continues to be increadibly hype and amazing
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next.map(|node| {
+	    self.next = node.next.as_deref();
+	    &node.elem
+	})
+    }
+}
+
+// iter_mut
+pub struct IterMut<'a, T> {
+    next: Option<&'a mut Node<T>>,
+}
+
+impl<T> List<T> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+	IterMut { next: self.head.as_deref_mut() }
+    }
+}
+
+impl<'a, T> Iterator for IterMut<'a, T> {
+    type Item =&'a mut T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next.take().map(|node| {
+	    self.next = node.next.as_deref_mut();
+	    &mut node.elem
+	})
+    }
+}

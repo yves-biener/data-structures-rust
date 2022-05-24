@@ -162,7 +162,7 @@ mod test_better_stack {
     #[test]
     fn test_peek_empty() {
 	// arrange
-	let mut list = better_stack::List::<i32>::new();
+	let list = better_stack::List::<i32>::new();
 
 	// act
 	let value = list.peek();
@@ -195,5 +195,81 @@ mod test_better_stack {
 	assert_eq!(list.pop(), Some(2));
 	assert_eq!(list.pop(), Some(1));
 	assert_eq!(list.pop(), None);
+    }
+
+    #[test]
+    fn test_into_iter() {
+	// arrange
+	let mut list = better_stack::List::new();
+	list.push(1);
+	list.push(2);
+	list.push(3);
+
+	// act
+	let mut iter = list.into_iter();
+
+	// assert
+	assert_eq!(iter.next(), Some(3));
+	assert_eq!(iter.next(), Some(2));
+	assert_eq!(iter.next(), Some(1));
+	assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_iter() {
+	// arrange
+	let mut list = better_stack::List::new();
+	list.push(1);
+	list.push(2);
+	list.push(3);
+
+	// act
+	let mut iter = list.iter();
+
+	// assert
+	assert_eq!(iter.next(), Some(&3));
+	assert_eq!(iter.next(), Some(&2));
+	assert_eq!(iter.next(), Some(&1));
+    }
+
+    #[test]
+    fn test_iter_empty() {
+	// arrange
+	let list = better_stack::List::<i32>::new();
+
+	// act
+	let mut iter = list.iter();
+
+	// assert
+	assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_iter_mut() {
+	// arrange
+	let mut list = better_stack::List::new();
+	list.push(1);
+	list.push(2);
+	list.push(3);
+
+	// act
+	let mut iter = list.iter_mut();
+
+	// assert
+	assert_eq!(iter.next(), Some(&mut 3));
+	assert_eq!(iter.next(), Some(&mut 2));
+	assert_eq!(iter.next(), Some(&mut 1));
+    }
+
+    #[test]
+    fn test_iter_mut_empty() {
+	// arrange
+	let mut list = better_stack::List::<i32>::new();
+
+	// act
+	let mut iter = list.iter_mut();
+
+	// assert
+	assert_eq!(iter.next(), None);
     }
 }
