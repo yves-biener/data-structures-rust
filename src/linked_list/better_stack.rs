@@ -1,5 +1,3 @@
-use std::mem;
-
 // using option instead of an own enum enables us to use all the available
 // functions on options we don't have to implement!
 type Link<T> = Option<Box<Node<T>>>;
@@ -23,8 +21,8 @@ impl<T> List<T> {
     pub fn push(&mut self, elem: T) {
 	let new_node = Box::new(Node {
 	    elem,
-	    // the trick using mem::replace is actually pretty common and for
-	    // option there is actually a method `take`
+	    // the trick using std::mem::replace is actually pretty common and
+	    // for option there is actually a method `take`
 	    next: self.head.take(),
 	});
 	self.head = Some(new_node);
