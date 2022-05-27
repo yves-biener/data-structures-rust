@@ -164,7 +164,7 @@ impl<T> LinkedList<T> {
     }
 
     pub fn clear(&mut self) {
-        while let Some(_) = self.pop_front() {}
+        while self.pop_front().is_some() {}
     }
 }
 
@@ -173,7 +173,7 @@ impl<T> LinkedList<T> {
 impl<T> Drop for LinkedList<T> {
     fn drop(&mut self) {
         // pop until we have to stop
-        while let Some(_) = self.pop_front() {}
+        while self.pop_front().is_some() {}
     }
 }
 
@@ -253,7 +253,7 @@ pub struct IterMut<'a, T> {
     front: Link<T>,
     back: Link<T>,
     len: usize,
-    _boo: PhantomData<&'a T>,
+    _boo: PhantomData<&'a mut T>,
 }
 
 impl<T> LinkedList<T> {
@@ -321,19 +321,13 @@ pub struct IntoIter<T> {
     list: LinkedList<T>,
 }
 
-impl<T> LinkedList<T> {
-    pub fn into_iter(self) -> IntoIter<T> {
-        IntoIter { list: self }
-    }
-}
-
 impl<T> IntoIterator for LinkedList<T> {
     type Item = T;
 
     type IntoIter = IntoIter<T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.into_iter()
+        Self::IntoIter { list: self }
     }
 }
 
@@ -407,10 +401,6 @@ impl<T: PartialEq> PartialEq for LinkedList<T> {
     fn eq(&self, other: &Self) -> bool {
         self.len() == other.len() && self.iter().eq(other)
     }
-
-    fn ne(&self, other: &Self) -> bool {
-        self.len() != other.len() || self.iter().ne(other)
-    }
 }
 
 impl<T: Eq> Eq for LinkedList<T> {}
@@ -433,5 +423,304 @@ impl<T: Hash> Hash for LinkedList<T> {
         for item in self {
             item.hash(state);
         }
+    }
+}
+
+// +----------------------+
+// | Send and Sync Traits |
+// +----------------------+
+unsafe impl<T: Send> Send for LinkedList<T> {}
+unsafe impl<T: Sync> Sync for LinkedList<T> {}
+
+// IntoIter does not need to implement Send and Sync as it auto derives from
+// LinkedList as it just contains a LinkedList which we just declared Send and
+// Sync!
+
+unsafe impl<'a, T: Send> Send for Iter<'a, T> {}
+unsafe impl<'a, T: Sync> Sync for Iter<'a, T> {}
+
+unsafe impl<'a, T: Send> Send for IterMut<'a, T> {}
+unsafe impl<'a, T: Sync> Sync for IterMut<'a, T> {}
+
+// +-----------------------+
+// | Cursor Implementation |
+// +-----------------------+
+pub struct CursorMut<'a, T> {
+    cur: Link<T>,
+    list: &'a mut LinkedList<T>,
+    index: Option<usize>,
+}
+
+impl<T> LinkedList<T> {
+    pub fn cursor_mut(&mut self) -> CursorMut<T> {
+        // because we are using a "ghost" element we start at None
+        CursorMut {
+            cur: None,
+            list: self,
+            index: None,
+        }
+    }
+}
+
+impl<'a, T> CursorMut<'a, T> {
+    pub fn index(&self) -> Option<usize> {
+        self.index
+    }
+
+    pub fn move_next(&mut self) {
+        if let Some(cur) = self.cur {
+            unsafe {
+                // we are on a real element, go to its next (back)
+                self.cur = (*cur.as_ptr()).back;
+                if self.cur.is_some() {
+                    *self.index.as_mut().unwrap() += 1;
+                } else {
+                    // We just walked to the ghost, no more index
+                    self.index = None;
+                }
+            }
+        } else if !self.list.is_empty() {
+            // we are the ghost, and there is a real front, so move to it
+            self.cur = self.list.front;
+            self.index = Some(0);
+        } else {
+            // we are the ghost, but that's the only element.. nothing to do
+        }
+    }
+
+    pub fn move_prev(&mut self) {
+        if let Some(cur) = self.cur {
+            unsafe {
+                // we are on a real element, go to its previous (front)
+                self.cur = (*cur.as_ptr()).front;
+                if self.cur.is_some() {
+                    *self.index.as_mut().unwrap() -= 1;
+                } else {
+                    // We just walked to the ghost, no more index
+                    self.index = None;
+                }
+            }
+        } else if !self.list.is_empty() {
+            // we are the ghost, and there is a real back, so move to it
+            self.cur = self.list.back;
+            self.index = Some(self.list.len - 1);
+        } else {
+            // we are the ghost, but that's the only element.. nothing to do
+        }
+    }
+
+    pub fn current(&mut self) -> Option<&mut T> {
+        unsafe { self.cur.map(|node| &mut (*node.as_ptr()).elem) }
+    }
+
+    pub fn peek_next(&mut self) -> Option<&mut T> {
+        unsafe {
+            let next = if let Some(cur) = self.cur {
+                // try to follow the cur node's back pointer
+                (*cur.as_ptr()).back
+            } else {
+                // ghost -> try to follow the list's front pointer
+                self.list.front
+            };
+
+            next.map(|node| &mut (*node.as_ptr()).elem)
+        }
+    }
+
+    pub fn peek_prev(&mut self) -> Option<&mut T> {
+        unsafe {
+            let prev = if let Some(cur) = self.cur {
+                // try to follow the cur node's front pointer
+                (*cur.as_ptr()).front
+            } else {
+                // ghost -> try to use the list's back pointer
+                self.list.back
+            };
+
+            prev.map(|node| &mut (*node.as_ptr()).elem)
+        }
+    }
+
+    pub fn split_before(&mut self) -> LinkedList<T> {
+        if let Some(cur) = self.cur {
+            // we are pointing at a real element, so the list is non-empty
+            debug_assert!(!self.list.is_empty());
+            unsafe {
+                // current state
+                let old_len = self.list.len;
+                let old_idx = self.index.unwrap(); // should never panic as the
+                                                   // list is non-empty
+                let prev = (*cur.as_ptr()).front.take();
+
+                // what self will become
+                let new_len = old_len - old_idx;
+                let new_front = self.cur;
+                let new_idx = Some(0);
+
+                // what the output will become
+                let output_len = old_len - new_len;
+                let output_front = self.list.front;
+                let output_back = prev;
+
+                // Break the links between cur and prev
+                if let Some(prev) = prev {
+                    (*prev.as_ptr()).back = None;
+                }
+
+                // produce the result
+                self.list.len = new_len;
+                self.list.front = new_front;
+                self.index = new_idx;
+
+                LinkedList {
+                    front: output_front,
+                    back: output_back,
+                    len: output_len,
+                    _boo: PhantomData,
+                }
+            }
+        } else {
+            // we are the "ghost", just replace our list with an empty one.
+            // No other state needs to be changed
+            std::mem::replace(self.list, LinkedList::new())
+        }
+    }
+
+    pub fn split_after(&mut self) -> LinkedList<T> {
+        if let Some(cur) = self.cur {
+            // we are pointing at a real element, so the list is non-empty
+            debug_assert!(!self.list.is_empty());
+            unsafe {
+                // current state
+                let old_len = self.list.len;
+                let old_idx = self.index.unwrap(); // should never panic as the
+                                                   // list is non-empty
+                let next = (*cur.as_ptr()).back.take();
+
+                // what self will become
+                let new_len = old_idx + 1;
+                let new_back = self.cur;
+                let new_idx = Some(old_idx);
+
+                // what the output will become
+                let output_len = old_len - new_len;
+                let output_front = next;
+                let output_back = self.list.back;
+
+                // Break the links between cur and prev
+                if let Some(next) = next {
+                    (*next.as_ptr()).front = None;
+                }
+
+                // produce the result
+                self.list.len = new_len;
+                self.list.back = new_back;
+                self.index = new_idx;
+
+                LinkedList {
+                    front: output_front,
+                    back: output_back,
+                    len: output_len,
+                    _boo: PhantomData,
+                }
+            }
+        } else {
+            // we are the "ghost", just replace our list with an empty one.
+            // No other state needs to be changed
+            std::mem::replace(self.list, LinkedList::new())
+        }
+    }
+
+    pub fn splice_before(&mut self, mut input: LinkedList<T>) {
+        unsafe {
+            if input.is_empty() {
+                // Input is empty do nothing.
+            } else if let Some(cur) = self.cur {
+                // both lists are non-empty
+                let in_front = input.front.take().unwrap();
+                let in_back = input.back.take().unwrap();
+
+                if let Some(prev) = (*cur.as_ptr()).front {
+                    // general case, no boundaries, just internal fixups
+                    (*prev.as_ptr()).back = Some(in_front);
+                    (*in_front.as_ptr()).front = Some(prev);
+                    (*cur.as_ptr()).front = Some(in_back);
+                    (*in_back.as_ptr()).back = Some(cur);
+                } else {
+                    // no prev, we are appending to the front
+                    (*cur.as_ptr()).front = Some(in_back);
+                    (*in_back.as_ptr()).back = Some(cur);
+                    self.list.front = Some(in_front);
+                }
+                // index moves forward by input length
+                *self.index.as_mut().unwrap() += input.len;
+            } else if let Some(back) = self.list.back {
+                // we are on the ghost but non-empty, append to the back below
+                let in_front = input.front.take().unwrap();
+                let in_back = input.back.take().unwrap();
+
+                (*back.as_ptr()).back = Some(in_front);
+                (*in_front.as_ptr()).front = Some(back);
+                self.list.back = Some(in_back);
+            } else {
+                // we are empty, become the input, remain on the ghost
+                std::mem::swap(self.list, &mut input);
+            }
+        }
+
+        self.list.len += input.len;
+        // Not necessary but polite to do
+        input.len = 0;
+        // input dropped here
+    }
+
+    pub fn splice_after(&mut self, mut input: LinkedList<T>) {
+        unsafe {
+            if input.is_empty() {
+                // Input is empty do nothing.
+            } else if let Some(cur) = self.cur {
+                // both lists are non-empty
+                let in_front = input.front.take().unwrap();
+                let in_back = input.back.take().unwrap();
+
+                if let Some(next) = (*cur.as_ptr()).back {
+                    // general case, no boundaries, just internal fixups
+                    (*next.as_ptr()).front = Some(in_back);
+                    (*in_back.as_ptr()).back = Some(next);
+                    (*cur.as_ptr()).back = Some(in_front);
+                    (*in_front.as_ptr()).front = Some(cur);
+                } else {
+                    // no next, we are appending to the back
+                    (*cur.as_ptr()).back = Some(in_front);
+                    (*in_front.as_ptr()).front = Some(cur);
+                    self.list.back = Some(in_back);
+                }
+                // index does not change
+            } else if let Some(front) = self.list.front {
+                // we are on the ghost but non-empty, append to the front
+                let in_front = input.front.take().unwrap();
+                let in_back = input.back.take().unwrap();
+
+                (*front.as_ptr()).front = Some(in_back);
+                (*in_back.as_ptr()).back = Some(front);
+                self.list.front = Some(in_front);
+            } else {
+                // we are empty, become the input, remain on the ghost
+                std::mem::swap(self.list, &mut input);
+            }
+        }
+
+        self.list.len += input.len;
+        // Not necessary but polite to do
+        input.len = 0;
+        // input dropped here
+    }
+
+    pub fn insert(&mut self, _elem: T) {
+        todo!()
+    }
+
+    pub fn remove(&mut self) -> Option<T> {
+        todo!()
     }
 }
