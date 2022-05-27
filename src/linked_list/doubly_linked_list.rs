@@ -716,11 +716,179 @@ impl<'a, T> CursorMut<'a, T> {
         // input dropped here
     }
 
-    pub fn insert(&mut self, _elem: T) {
-        todo!()
+    pub fn insert_after(&mut self, elem: T) {
+        unsafe {
+            let new = NonNull::new_unchecked(Box::into_raw(Box::new(Node {
+                front: None,
+                back: None,
+                elem,
+            })));
+
+            if let Some(cur) = self.cur {
+                // we have elements in the list
+                if let Some(next) = (*cur.as_ptr()).back {
+                    // there is also a next element, so we are not at the end of the list
+                    (*next.as_ptr()).front = Some(new);
+                    (*cur.as_ptr()).back = Some(new);
+                    (*new.as_ptr()).front = Some(cur);
+                    (*new.as_ptr()).back = Some(next);
+                } else {
+                    // we are at the end of the list (we are the ghost)
+                    (*cur.as_ptr()).back = Some(new);
+                    (*new.as_ptr()).front = Some(cur);
+                    self.list.back = Some(new);
+                }
+            } else {
+                // we don't have elements in the list, such that `elem` will be the first entry
+                self.list.front = Some(new);
+                self.list.back = Some(new);
+            }
+            // increase length
+            self.list.len += 1;
+        }
     }
 
-    pub fn remove(&mut self) -> Option<T> {
-        todo!()
+    pub fn insert_before(&mut self, elem: T) {
+        unsafe {
+            let new = NonNull::new_unchecked(Box::into_raw(Box::new(Node {
+                front: None,
+                back: None,
+                elem,
+            })));
+
+            if let Some(cur) = self.cur {
+                // we have elements in the list
+                if let Some(prev) = (*cur.as_ptr()).front {
+                    // there is also a prev element, so we are not at the beginning of the list
+                    (*new.as_ptr()).front = Some(prev);
+                    (*new.as_ptr()).back = Some(cur);
+                    (*cur.as_ptr()).front = Some(new);
+                    (*prev.as_ptr()).back = Some(new);
+                } else {
+                    // we are at the beginning of the list (we are the ghost)
+                    (*cur.as_ptr()).front = Some(new);
+                    (*new.as_ptr()).back = Some(cur);
+                    self.list.front = Some(new);
+                }
+            } else {
+                // we don't have elements in the list, such that `elem` will be the first entry
+                self.list.front = Some(new);
+                self.list.back = Some(new);
+            }
+            // increase length
+            self.list.len += 1;
+        }
+    }
+
+    pub fn remove_after(&mut self) -> Option<T> {
+        unsafe {
+            if let Some(cur) = self.cur {
+                // current list has elements
+                if let Some(next) = (*cur.as_ptr()).back {
+                    // there is an element to remove
+                    // bring back the Box in order to drop it in the end
+                    let boxed = Box::from_raw(next.as_ptr());
+                    let result = Some(boxed.elem);
+
+                    if let Some(box_next) = boxed.back {
+                        // there is an element after the one to remove
+                        (*cur.as_ptr()).back = Some(box_next);
+                        (*box_next.as_ptr()).front = Some(cur);
+                    } else {
+                        // there is no element after the one to remove (ghost)
+                        (*cur.as_ptr()).back = None;
+                        self.list.back = Some(cur);
+                    }
+
+                    // decrease length
+                    self.list.len -= 1;
+                    result
+                    // drop boxed afterwards
+                } else {
+                    // we cannot remove the ghost element so we do nothing
+                    None
+                }
+            } else {
+                // we are the ghost
+                if let Some(front) = self.list.front {
+                    let boxed = Box::from_raw(front.as_ptr());
+                    let result = Some(boxed.elem);
+
+                    if let Some(box_next) = boxed.back {
+                        // there is a next element which can be the new front of the list
+                        self.list.front = Some(box_next);
+                        (*box_next.as_ptr()).front = None;
+                    } else {
+                        // the element we remove is the only element in the list
+                        self.list.front = None;
+                        self.list.back = None;
+                    }
+
+                    // decrease length
+                    self.list.len -= 1;
+                    result
+                    // drop boxed afterwards
+                } else {
+                    // empty list.. nothing to do
+                    None
+                }
+            }
+        }
+    }
+
+    pub fn remove_before(&mut self) -> Option<T> {
+        unsafe {
+            if let Some(cur) = self.cur {
+                // current list has elements
+                if let Some(prev) = (*cur.as_ptr()).front {
+                    // there is an element to remove
+                    // bring back the Box in order to drop it in the end
+                    let boxed = Box::from_raw(prev.as_ptr());
+                    let result = Some(boxed.elem);
+
+                    if let Some(box_prev) = boxed.front {
+                        // there is an element before the one to remove
+                        (*cur.as_ptr()).front = Some(box_prev);
+                        (*box_prev.as_ptr()).back = Some(cur);
+                    } else {
+                        // there is no element before the one to remove (ghost)
+                        (*cur.as_ptr()).front = None;
+                        self.list.front = Some(cur);
+                    }
+
+                    // decrease length
+                    self.list.len -= 1;
+                    result
+                    // drop boxed afterwards
+                } else {
+                    // we cannot remove the ghost element so we do nothing
+                    None
+                }
+            } else {
+                // we are the ghost
+                if let Some(back) = self.list.back {
+                    let boxed = Box::from_raw(back.as_ptr());
+                    let result = Some(boxed.elem);
+
+                    if let Some(box_prev) = boxed.front {
+                        // there is a prev element which can be the new front of the list
+                        self.list.back = Some(box_prev);
+                        (*box_prev.as_ptr()).back = None;
+                    } else {
+                        // the element we remove is the only element in the list
+                        self.list.front = None;
+                        self.list.back = None;
+                    }
+
+                    // decrease length
+                    self.list.len -= 1;
+                    result
+                    // drop boxed afterwards
+                } else {
+                    // empty list.. nothing to do
+                    None
+                }
+            }
+        }
     }
 }

@@ -1486,6 +1486,246 @@ mod test_doubly_linked_list {
     }
 
     #[test]
+    fn test_cursor_insert_after_empty() {
+        // arrange
+        let mut list: doubly_linked_list::LinkedList<i32> = doubly_linked_list::LinkedList::new();
+        let mut cursor = list.cursor_mut();
+
+        // act
+        cursor.insert_after(1);
+
+        // assert
+        assert_eq!(cursor.peek_next(), Some(&mut 1));
+        assert!(cursor.current().is_none());
+        assert_eq!(cursor.peek_prev(), Some(&mut 1));
+        assert_eq!(list.len(), 1);
+    }
+
+    #[test]
+    fn test_cursor_insert_after() {
+        // arrange
+        let mut list: doubly_linked_list::LinkedList<i32> = doubly_linked_list::LinkedList::new();
+        list.extend([1, 3]);
+        let mut cursor = list.cursor_mut();
+        cursor.move_next();
+        assert_eq!(cursor.index(), Some(0));
+
+        // act
+        cursor.insert_after(2);
+
+        // assert
+        assert_eq!(cursor.peek_next(), Some(&mut 2));
+        assert_eq!(cursor.current(), Some(&mut 1));
+        assert_eq!(cursor.peek_prev(), None);
+        assert_eq!(list.len(), 3);
+        assert_eq!(list, (1..4).collect());
+    }
+
+    #[test]
+    fn test_cursor_insert_before_empty() {
+        // arrange
+        let mut list: doubly_linked_list::LinkedList<i32> = doubly_linked_list::LinkedList::new();
+        let mut cursor = list.cursor_mut();
+
+        // act
+        cursor.insert_before(1);
+
+        // assert
+        assert_eq!(cursor.peek_next(), Some(&mut 1));
+        assert!(cursor.current().is_none());
+        assert_eq!(cursor.peek_prev(), Some(&mut 1));
+        assert_eq!(list.len(), 1);
+    }
+
+    #[test]
+    fn test_cursor_insert_before() {
+        // arrange
+        let mut list: doubly_linked_list::LinkedList<i32> = doubly_linked_list::LinkedList::new();
+        list.extend([1, 3]);
+        let mut cursor = list.cursor_mut();
+        cursor.move_prev();
+        assert_eq!(cursor.index(), Some(1));
+
+        // act
+        cursor.insert_before(2);
+
+        // assert
+        assert_eq!(cursor.peek_prev(), Some(&mut 2));
+        assert_eq!(cursor.current(), Some(&mut 3));
+        assert_eq!(cursor.peek_next(), None);
+        assert_eq!(list.len(), 3);
+        assert_eq!(list, (1..4).collect());
+    }
+
+    #[test]
+    fn test_cursor_remove_after_empty() {
+        // arrange
+        let mut list: doubly_linked_list::LinkedList<i32> = doubly_linked_list::LinkedList::new();
+        let mut cursor = list.cursor_mut();
+
+        // act
+        let value = cursor.remove_after();
+
+        // assert
+        assert!(value.is_none());
+    }
+
+    #[test]
+    fn test_cursor_remove_after_general() {
+        // arrange
+        let mut list: doubly_linked_list::LinkedList<i32> = doubly_linked_list::LinkedList::new();
+        list.extend([1, 4, 2, 3]);
+        let mut cursor = list.cursor_mut();
+        cursor.move_next();
+        assert_eq!(cursor.index(), Some(0));
+
+        // act
+        let value = cursor.remove_after();
+
+        // assert
+        assert_eq!(value, Some(4));
+        assert_eq!(list.len(), 3);
+        assert_eq!(list, (1..4).collect());
+    }
+
+    #[test]
+    fn test_cursor_remove_after_start() {
+        // arrange
+        let mut list: doubly_linked_list::LinkedList<i32> = doubly_linked_list::LinkedList::new();
+        list.extend([4, 1, 2, 3]);
+        let mut cursor = list.cursor_mut();
+        assert_eq!(cursor.index(), None);
+
+        // act
+        let value = cursor.remove_after();
+
+        // assert
+        assert_eq!(value, Some(4));
+        assert_eq!(list.len(), 3);
+        assert_eq!(list, (1..4).collect());
+    }
+
+    #[test]
+    fn test_cursor_remove_after_end() {
+        // arrange
+        let mut list: doubly_linked_list::LinkedList<i32> = doubly_linked_list::LinkedList::new();
+        list.extend([1, 2, 3, 4]);
+        let mut cursor = list.cursor_mut();
+        cursor.move_prev();
+        cursor.move_prev();
+        assert_eq!(cursor.index(), Some(2));
+
+        // act
+        let value = cursor.remove_after();
+
+        // assert
+        assert_eq!(value, Some(4));
+        assert_eq!(list.len(), 3);
+        assert_eq!(list, (1..4).collect());
+    }
+
+    #[test]
+    fn test_cursor_remove_after_single_element() {
+        // arrange
+        let mut list: doubly_linked_list::LinkedList<i32> = doubly_linked_list::LinkedList::new();
+        list.extend([4]);
+        let mut cursor = list.cursor_mut();
+        assert_eq!(cursor.index(), None);
+
+        // act
+        let value = cursor.remove_after();
+
+        // assert
+        assert_eq!(value, Some(4));
+        assert!(list.is_empty());
+        assert_eq!(list, doubly_linked_list::LinkedList::new());
+    }
+
+    #[test]
+    fn test_cursor_remove_before_empty() {
+        // arrange
+        let mut list: doubly_linked_list::LinkedList<i32> = doubly_linked_list::LinkedList::new();
+        let mut cursor = list.cursor_mut();
+
+        // act
+        let value = cursor.remove_before();
+
+        // assert
+        assert!(value.is_none());
+    }
+
+    #[test]
+    fn test_cursor_remove_before_general() {
+        // arrange
+        let mut list: doubly_linked_list::LinkedList<i32> = doubly_linked_list::LinkedList::new();
+        list.extend([1, 2, 4, 3]);
+        let mut cursor = list.cursor_mut();
+        cursor.move_prev();
+        assert_eq!(cursor.index(), Some(3));
+
+        // act
+        let value = cursor.remove_before();
+
+        // assert
+        assert_eq!(value, Some(4));
+        assert_eq!(list.len(), 3);
+        assert_eq!(list, (1..4).collect());
+    }
+
+    #[test]
+    fn test_cursor_remove_before_start() {
+        // arrange
+        let mut list: doubly_linked_list::LinkedList<i32> = doubly_linked_list::LinkedList::new();
+        list.extend([4, 1, 2, 3]);
+        let mut cursor = list.cursor_mut();
+        cursor.move_next();
+        cursor.move_next();
+        assert_eq!(cursor.index(), Some(1));
+
+        // act
+        let value = cursor.remove_before();
+
+        // assert
+        assert_eq!(value, Some(4));
+        assert_eq!(list.len(), 3);
+        assert_eq!(list, (1..4).collect());
+    }
+
+    #[test]
+    fn test_cursor_remove_before_end() {
+        // arrange
+        let mut list: doubly_linked_list::LinkedList<i32> = doubly_linked_list::LinkedList::new();
+        list.extend([1, 2, 3, 4]);
+        let mut cursor = list.cursor_mut();
+        assert_eq!(cursor.index(), None);
+
+        // act
+        let value = cursor.remove_before();
+
+        // assert
+        assert_eq!(value, Some(4));
+        assert_eq!(list.len(), 3);
+        assert_eq!(list, (1..4).collect());
+    }
+
+    #[test]
+    fn test_cursor_remove_before_single_element() {
+        // arrange
+        let mut list: doubly_linked_list::LinkedList<i32> = doubly_linked_list::LinkedList::new();
+        list.extend([4]);
+        let mut cursor = list.cursor_mut();
+        assert_eq!(cursor.index(), None);
+
+        // act
+        let value = cursor.remove_before();
+
+        // assert
+        assert_eq!(value, Some(4));
+        assert!(list.is_empty());
+        assert_eq!(list, doubly_linked_list::LinkedList::new());
+    }
+
+    #[test]
     fn test_cursor_split_before_ghost() {
         // arrange
         let mut list: doubly_linked_list::LinkedList<i32> = doubly_linked_list::LinkedList::new();
