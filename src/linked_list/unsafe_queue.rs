@@ -42,42 +42,38 @@ impl<T> List<T> {
     }
 
     pub fn pop(&mut self) -> Option<T> {
-	unsafe {
-	    if self.head.is_null() {
-		None
-	    } else {
-		// rise from the grave
-		let head = Box::from_raw(self.head);
-		self.head = head.next;
+        unsafe {
+            if self.head.is_null() {
+                None
+            } else {
+                // rise from the grave
+                let head = Box::from_raw(self.head);
+                self.head = head.next;
 
-		if self.head.is_null() {
-		    // if head is null the list is empty so we also set tail to
-		    // be empty
-		    self.tail = ptr::null_mut();
-		}
-		Some(head.elem)
-	    }
-	}
+                if self.head.is_null() {
+                    // if head is null the list is empty so we also set tail to
+                    // be empty
+                    self.tail = ptr::null_mut();
+                }
+                Some(head.elem)
+            }
+        }
     }
 
     pub fn peek(&self) -> Option<&T> {
-	unsafe {
-	    self.head.as_ref().map(|node| &node.elem)
-	}
+        unsafe { self.head.as_ref().map(|node| &node.elem) }
     }
 
     pub fn peek_mut(&mut self) -> Option<&mut T> {
-	unsafe {
-	    self.head.as_mut().map(|node| &mut node.elem)
-	}
+        unsafe { self.head.as_mut().map(|node| &mut node.elem) }
     }
 }
 
 impl<T> Drop for List<T> {
     fn drop(&mut self) {
-	// just pop all elements one by one
-	// this is simple but can be inefficient
-        while let Some(_) = self.pop() {}
+        // just pop all elements one by one
+        // this is simple but can be inefficient
+        while self.pop().is_some() {}
     }
 }
 
@@ -96,19 +92,23 @@ pub struct IterMut<'a, T> {
 
 impl<T> List<T> {
     pub fn into_iter(self) -> IntoIter<T> {
-	IntoIter(self)
+        IntoIter(self)
     }
 
     pub fn iter(&self) -> Iter<'_, T> {
-	unsafe {
-	    Iter { next: self.head.as_ref() }
-	}
+        unsafe {
+            Iter {
+                next: self.head.as_ref(),
+            }
+        }
     }
 
     pub fn iter_mut(&mut self) -> IterMut<'_, T> {
-	unsafe {
-	    IterMut { next: self.head.as_mut() }
-	}
+        unsafe {
+            IterMut {
+                next: self.head.as_mut(),
+            }
+        }
     }
 }
 
@@ -125,11 +125,11 @@ impl<'a, T> Iterator for Iter<'a, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
-	    self.next.map(|node| {
-		self.next = node.next.as_ref();
-		&node.elem
-	    })
-	}
+            self.next.map(|node| {
+                self.next = node.next.as_ref();
+                &node.elem
+            })
+        }
     }
 }
 
@@ -138,10 +138,10 @@ impl<'a, T> Iterator for IterMut<'a, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
-	    self.next.take().map(|node| {
-		self.next = node.next.as_mut();
-		&mut node.elem
-	    })
-	}
+            self.next.take().map(|node| {
+                self.next = node.next.as_mut();
+                &mut node.elem
+            })
+        }
     }
 }
