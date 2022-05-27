@@ -4,16 +4,52 @@ mod persistent_stack;
 mod stack;
 mod unsafe_queue;
 
-// Doctest to prove that IterMut is not covariant to check if it is safe to
-// implement Send and Sync Traits.
-/// ```compile_fail,E0308
-/// use crate::data_structures_rust::linked_list::doubly_linked_list::IterMut;
-///
-/// fn iter_mut_covariant<'i, 'a, T>(x: IterMut<'i, &'static T>)
-/// -> IterMut<'i, &'a T> { x }
-/// ```
-#[cfg(doctest)]
-fn iter_mut_invariant() {}
+#[allow(dead_code)]
+fn assert_properties() {
+    fn is_send<T: Send>() {}
+    fn is_sync<T: Sync>() {}
+
+    is_send::<doubly_linked_list::LinkedList<i32>>();
+    is_sync::<doubly_linked_list::LinkedList<i32>>();
+
+    is_send::<doubly_linked_list::IntoIter<i32>>();
+    is_sync::<doubly_linked_list::IntoIter<i32>>();
+
+    is_send::<doubly_linked_list::Iter<i32>>();
+    is_sync::<doubly_linked_list::Iter<i32>>();
+
+    is_send::<doubly_linked_list::IterMut<i32>>();
+    is_sync::<doubly_linked_list::IterMut<i32>>();
+
+    fn linked_list_covariant<'a, T>(
+        x: doubly_linked_list::LinkedList<&'static T>,
+    ) -> doubly_linked_list::LinkedList<&'a T> {
+        x
+    }
+
+    fn iter_covariant<'i, 'a, T>(
+        x: doubly_linked_list::Iter<'a, &'static T>,
+    ) -> doubly_linked_list::Iter<'i, &'a T> {
+        x
+    }
+
+    fn into_iter_covariant<'a, T>(
+        x: doubly_linked_list::IntoIter<&'static T>,
+    ) -> doubly_linked_list::IntoIter<&'a T> {
+        x
+    }
+
+    // Doctest to prove that IterMut is not covariant to check if it is safe to
+    // implement Send and Sync Traits.
+    /// ```compile_fail,E0308
+    /// use crate::data_structures_rust::linked_list::doubly_linked_list::IterMut;
+    ///
+    /// fn iter_mut_covariant<'i, 'a, T>(x: IterMut<'i, &'static T>)
+    /// -> IterMut<'i, &'a T> { x }
+    /// ```
+    #[cfg(doctest)]
+    fn iter_mut_invariant() {}
+}
 
 #[cfg(test)]
 mod test_stack {
